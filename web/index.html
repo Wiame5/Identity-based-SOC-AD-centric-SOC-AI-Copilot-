@@ -1,0 +1,1260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>KEEP — Identity-Based SOC Copilot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#0B0B0A;
+  --panel:#131311;
+  --panel-alt:#1B1A17;
+  --panel-hover:#201F1B;
+  --hairline:#2E2C27;
+  --hairline-soft:#201F1C;
+  --ink:#E4E0D4;
+  --ink-dim:#A19C8C;
+  --ink-faint:#5C584C;
+  --signal:#E2A33D;
+  --signal-dim:rgba(226,163,61,0.10);
+  --alert:#C1543C;
+  --alert-dim:rgba(193,84,60,0.12);
+  --ok:#8FA66B;
+  --ok-dim:rgba(143,166,107,0.12);
+  --ta0003:#9A8FBE;
+  --ta0004:#C1543C;
+  --ta0006:#E2A33D;
+  --ta0007:#6E8FA6;
+  --ta0008:#B08A4E;
+  --benign:#8FA66B;
+  --r:3px;
+  --font-mono:'IBM Plex Mono',monospace;
+  --font-sans:'IBM Plex Sans',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html{color-scheme:dark;}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--font-sans);
+  font-size:13.5px;
+  line-height:1.55;
+}
+::selection{background:var(--signal-dim);color:var(--signal);}
+::-webkit-scrollbar{width:9px;height:9px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--hairline);border:2px solid var(--paper);}
+::-webkit-scrollbar-thumb:hover{background:var(--ink-faint);}
+a{color:inherit;text-decoration:none;}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;}
+:focus-visible{outline:1.5px solid var(--signal);outline-offset:1px;}
+input,select{font-family:inherit;color:inherit;}
+
+/* ---------- cursor blink ---------- */
+.cursor-blink{display:inline-block;width:7px;height:12px;background:var(--signal);animation:blink 1.1s steps(1) infinite;vertical-align:-1px;}
+@keyframes blink{0%,49%{opacity:1;}50%,100%{opacity:0;}}
+
+/* ---------- Layout ---------- */
+.shell{display:grid;grid-template-columns:252px 1fr;min-height:100vh;}
+
+/* ---------- Sidebar ---------- */
+.sidebar{
+  background:var(--panel);
+  border-right:1px solid var(--hairline);
+  display:flex;flex-direction:column;
+  padding:22px 16px;
+  position:sticky;top:0;height:100vh;
+}
+.brand{padding:2px 2px 20px;border-bottom:1px solid var(--hairline-soft);margin-bottom:16px;}
+.brand-row{display:flex;align-items:baseline;gap:9px;}
+.brand-mark{
+  font-family:var(--font-mono);font-weight:700;font-size:14px;
+  border:1px solid var(--signal);color:var(--signal);
+  width:26px;height:26px;display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.brand-name{font-family:var(--font-mono);font-weight:700;font-size:16.5px;letter-spacing:0.5px;}
+.brand-sub{font-family:var(--font-mono);font-size:10px;color:var(--ink-faint);margin-top:6px;letter-spacing:0.3px;}
+.brand-sub b{color:var(--ink-dim);font-weight:500;}
+
+.tree-label{font-family:var(--font-mono);font-size:10px;color:var(--ink-faint);letter-spacing:0.6px;padding:0 2px 8px;text-transform:uppercase;}
+.nav{display:flex;flex-direction:column;margin-bottom:22px;}
+.nav-item{
+  display:flex;align-items:center;gap:0;
+  padding:6px 2px;
+  color:var(--ink-dim);font-size:13px;font-family:var(--font-mono);
+  transition:color .1s;
+  border-left:1px solid transparent;
+}
+.nav-item .glyph{color:var(--ink-faint);margin-right:8px;width:14px;flex-shrink:0;text-align:center;}
+.nav-item:hover{color:var(--ink);}
+.nav-item.active{color:var(--signal);border-left-color:var(--signal);padding-left:8px;margin-left:-9px;}
+.nav-item.active .glyph{color:var(--signal);}
+.nav-item .count{margin-left:auto;color:var(--ink-faint);font-size:11px;}
+.nav-item.active .count{color:var(--signal);}
+
+.sidebar-spacer{flex:1;}
+
+.cmdk-hint{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 10px;border:1px solid var(--hairline);
+  color:var(--ink-faint);font-size:11.5px;font-family:var(--font-mono);margin-bottom:12px;
+  transition:border-color .15s;
+}
+.cmdk-hint:hover{border-color:var(--ink-faint);color:var(--ink-dim);}
+.cmdk-hint .k{border:1px solid var(--hairline);padding:1px 5px;color:var(--ink-dim);}
+
+.status-block{border:1px solid var(--hairline);padding:10px 11px;font-family:var(--font-mono);font-size:10.5px;color:var(--ink-faint);}
+.status-line{display:flex;align-items:center;gap:7px;padding:2px 0;}
+.status-line .b{color:var(--signal);}
+.status-line .cursor-blink{width:5px;height:5px;}
+
+/* ---------- Main ---------- */
+.main{min-width:0;}
+.topbar{
+  display:flex;align-items:center;gap:16px;
+  padding:14px 30px;border-bottom:1px solid var(--hairline);
+  background:var(--paper);position:sticky;top:0;z-index:20;
+}
+.dn-path{
+  font-family:var(--font-mono);font-size:11.5px;color:var(--ink-faint);
+}
+.dn-path .seg{color:var(--ink-dim);}
+.dn-path .cur{color:var(--signal);}
+.topbar-spacer{flex:1;}
+.search-trigger{
+  display:flex;align-items:center;gap:9px;
+  background:var(--panel);border:1px solid var(--hairline);
+  padding:7px 11px;color:var(--ink-faint);font-size:12px;font-family:var(--font-mono);
+  min-width:260px;transition:border-color .15s;
+}
+.search-trigger:hover{border-color:var(--ink-faint);}
+.search-trigger .k{margin-left:auto;border:1px solid var(--hairline);padding:1px 5px;font-size:10px;}
+.operator-tag{font-family:var(--font-mono);font-size:11px;color:var(--ink-faint);border:1px solid var(--hairline);padding:5px 10px;white-space:nowrap;}
+.operator-tag b{color:var(--ink-dim);font-weight:500;}
+
+.view{padding:28px 30px 70px;max-width:1360px;}
+.view-header{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:22px;gap:16px;flex-wrap:wrap;}
+.view-title{font-family:var(--font-mono);font-size:20px;font-weight:600;letter-spacing:0.2px;}
+.view-title .n{color:var(--ink-faint);font-weight:400;}
+.view-desc{color:var(--ink-faint);font-size:12.5px;margin-top:5px;}
+.live-tag{
+  display:inline-flex;align-items:center;gap:7px;
+  padding:5px 10px;font-size:11px;font-family:var(--font-mono);color:var(--ok);
+  border:1px solid var(--hairline);
+}
+.live-tag .cursor-blink{width:5px;height:5px;background:var(--ok);}
+
+/* ---------- bracket buttons ---------- */
+.bbtn{
+  font-family:var(--font-mono);font-size:11.5px;font-weight:500;
+  color:var(--ink-dim);border:1px solid var(--hairline);padding:8px 14px;
+  display:inline-flex;align-items:center;gap:6px;transition:all .12s;letter-spacing:0.3px;
+}
+.bbtn:hover{border-color:var(--ink-faint);color:var(--ink);background:var(--panel-hover);}
+.bbtn.on{border-color:var(--signal);color:var(--signal);}
+.bbtn.on:hover{background:var(--signal-dim);}
+
+/* ---------- stat manifest row ---------- */
+.manifest{border:1px solid var(--hairline);margin-bottom:18px;}
+.manifest-row{display:grid;grid-template-columns:repeat(4,1fr);}
+.manifest-cell{padding:16px 20px;border-right:1px solid var(--hairline);}
+.manifest-cell:last-child{border-right:none;}
+.manifest-label{font-family:var(--font-mono);font-size:10px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:0.6px;}
+.manifest-value{font-family:var(--font-mono);font-size:26px;font-weight:600;margin-top:9px;color:var(--ink);letter-spacing:-0.3px;}
+.manifest-value .u{font-size:13px;color:var(--ink-faint);font-weight:400;margin-left:2px;}
+.manifest-note{font-size:11px;color:var(--ink-faint);margin-top:7px;font-family:var(--font-mono);}
+.manifest-note.warn{color:var(--signal);}
+
+/* ---------- panels ---------- */
+.grid-2{display:grid;grid-template-columns:1.7fr 1fr;gap:16px;align-items:start;}
+.panel{border:1px solid var(--hairline);background:var(--panel);}
+.panel-head{display:flex;align-items:center;justify-content:space-between;padding:13px 18px;border-bottom:1px solid var(--hairline);}
+.panel-title{font-family:var(--font-mono);font-size:12.5px;font-weight:600;letter-spacing:0.2px;}
+.panel-sub{font-size:11px;color:var(--ink-faint);margin-top:3px;}
+.panel-link{font-family:var(--font-mono);font-size:11px;color:var(--signal);}
+.panel-body{}
+.panel-body.pad{padding:16px 18px;}
+
+/* ---------- event rows ---------- */
+.event-row{
+  display:grid;grid-template-columns:16px 1fr auto auto auto;gap:14px;align-items:center;
+  padding:11px 18px;border-bottom:1px solid var(--hairline-soft);
+  transition:background .1s;cursor:pointer;
+}
+.event-row:last-child{border-bottom:none;}
+.event-row:hover{background:var(--panel-hover);}
+.sev-mark{font-family:var(--font-mono);font-size:12px;text-align:center;}
+.sev-mark.critical{color:var(--alert);}
+.sev-mark.info{color:var(--ok);}
+.event-main{min-width:0;}
+.event-tech{font-size:12.5px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.event-path{font-family:var(--font-mono);font-size:10.5px;color:var(--ink-faint);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tactic-tag{
+  font-family:var(--font-mono);font-size:10px;font-weight:600;
+  padding:2px 7px;border:1px solid;white-space:nowrap;
+}
+.event-time{font-family:var(--font-mono);font-size:11px;color:var(--ink-faint);white-space:nowrap;}
+.chev{color:var(--ink-faint);font-family:var(--font-mono);font-size:12px;}
+
+/* ---------- tactic bars ---------- */
+.tbar-row{padding:10px 18px;}
+.tbar-top{display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:6px;font-family:var(--font-mono);}
+.tbar-name{color:var(--ink-dim);}
+.tbar-name .tick{display:inline-block;width:8px;height:8px;margin-right:7px;vertical-align:-1px;}
+.tbar-count{color:var(--ink-faint);}
+.tbar-track{height:3px;background:var(--hairline-soft);}
+.tbar-fill{height:100%;transition:width 1s cubic-bezier(.16,1,.3,1);}
+
+/* ---------- dial gauge ---------- */
+.dial-wrap{position:relative;display:inline-flex;align-items:center;justify-content:center;flex-direction:column;}
+.dial-center{position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center;top:38%;}
+.dial-pct{font-family:var(--font-mono);font-weight:700;line-height:1;}
+.dial-legend{display:flex;gap:14px;margin-top:6px;font-size:10.5px;color:var(--ink-faint);font-family:var(--font-mono);}
+.dial-legend span{display:flex;align-items:center;gap:6px;}
+.dial-legend i{width:9px;height:2px;display:inline-block;}
+
+/* ---------- filters ---------- */
+.filter-row{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;}
+.search-box{
+  display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--hairline);
+  padding:7px 11px;margin-left:auto;min-width:250px;font-family:var(--font-mono);
+}
+.search-box input{background:none;border:none;outline:none;color:var(--ink);font-size:11.5px;width:100%;}
+.search-box input::placeholder{color:var(--ink-faint);}
+.search-box .prompt{color:var(--signal);}
+
+/* ---------- table ---------- */
+.table-wrap{border:1px solid var(--hairline);background:var(--panel);}
+.thead{
+  display:grid;grid-template-columns:90px 1fr 110px 74px 160px 100px 88px 24px;gap:12px;
+  padding:9px 18px;border-bottom:1px solid var(--hairline);
+  font-family:var(--font-mono);font-size:9.5px;text-transform:uppercase;letter-spacing:0.6px;color:var(--ink-faint);
+}
+.trow{
+  display:grid;grid-template-columns:90px 1fr 110px 74px 160px 100px 88px 24px;gap:12px;align-items:center;
+  padding:11px 18px;border-bottom:1px solid var(--hairline-soft);
+  transition:background .1s;cursor:pointer;
+}
+.trow:last-child{border-bottom:none;}
+.trow:hover{background:var(--panel-hover);}
+.mono-cell{font-family:var(--font-mono);font-size:11px;color:var(--ink-dim);}
+.eid-tag{font-family:var(--font-mono);font-size:10.5px;border:1px solid var(--hairline);padding:2px 6px;color:var(--ink-dim);}
+.sev-word{font-family:var(--font-mono);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;}
+.sev-word.critical{color:var(--alert);}
+.sev-word.info{color:var(--ok);}
+
+/* ---------- copilot ---------- */
+.copilot-grid{display:grid;grid-template-columns:340px 1fr;gap:16px;align-items:start;}
+.evt-summary{padding:24px 20px;text-align:center;}
+.evt-summary-tech{font-family:var(--font-mono);font-size:15.5px;font-weight:700;margin-top:16px;}
+.evt-summary-desc{font-size:12px;color:var(--ink-dim);margin-top:8px;line-height:1.6;}
+.badge-row{display:flex;gap:8px;justify-content:center;margin-top:16px;flex-wrap:wrap;}
+.mitre-tag{
+  font-family:var(--font-mono);font-size:10.5px;font-weight:600;
+  padding:4px 9px;border:1px solid;
+}
+.dn-block{
+  border-top:1px solid var(--hairline-soft);margin-top:18px;padding-top:14px;text-align:left;
+  font-family:var(--font-mono);font-size:10.5px;color:var(--ink-faint);line-height:1.9;
+}
+.dn-block .l{color:var(--ink-dim);}
+.field-list{border-top:1px solid var(--hairline-soft);margin-top:14px;padding-top:14px;text-align:left;}
+.field-row{display:flex;justify-content:space-between;padding:4px 0;font-size:11px;gap:10px;font-family:var(--font-mono);}
+.field-key{color:var(--ink-faint);}
+.field-val{color:var(--ink-dim);text-align:right;word-break:break-all;}
+
+.chat-panel{display:flex;flex-direction:column;height:660px;}
+.chat-scroll{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:18px;}
+.msg{display:flex;gap:12px;}
+.msg-tag{
+  font-family:var(--font-mono);font-size:10px;color:var(--ink-faint);
+  border:1px solid var(--hairline);width:64px;height:22px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;letter-spacing:0.3px;
+}
+.msg-tag.copilot{color:var(--signal);border-color:var(--signal);}
+.msg-tag.user{color:var(--ink-dim);}
+.msg-body{flex:1;min-width:0;}
+.msg-name{font-size:11px;font-weight:600;margin-bottom:6px;font-family:var(--font-mono);color:var(--ink-dim);display:flex;align-items:center;gap:8px;}
+.msg-name .tag2{color:var(--ink-faint);font-weight:400;}
+.msg-text{font-size:12.8px;color:var(--ink-dim);line-height:1.7;}
+.msg-text p{margin-bottom:10px;}
+.msg-text p:last-child{margin-bottom:0;}
+.msg-text strong{color:var(--ink);font-weight:600;}
+.msg-text code{font-family:var(--font-mono);background:var(--panel-alt);padding:1px 5px;color:var(--signal);font-size:11.5px;}
+.typing{display:flex;gap:5px;padding:4px 0;font-family:var(--font-mono);color:var(--ink-faint);font-size:11px;}
+.typing span{animation:tdot 1.3s infinite;}
+.typing span:nth-child(2){animation-delay:.15s;}
+.typing span:nth-child(3){animation-delay:.3s;}
+@keyframes tdot{0%,60%,100%{opacity:0.25;}30%{opacity:1;}}
+
+.action-checklist{margin-top:12px;display:flex;flex-direction:column;gap:6px;}
+.action-item{
+  display:flex;align-items:flex-start;gap:10px;font-size:12px;color:var(--ink-dim);
+  padding:8px 10px;border:1px solid var(--hairline-soft);
+  transition:all .12s;cursor:pointer;font-family:var(--font-mono);
+}
+.action-item:hover{border-color:var(--hairline);background:var(--panel-alt);}
+.action-item.done{opacity:0.45;}
+.action-item.done .action-label{text-decoration:line-through;}
+.chk{
+  width:14px;height:14px;border:1px solid var(--hairline);flex-shrink:0;margin-top:1px;
+  display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--signal);
+}
+.action-item.done .chk{border-color:var(--signal);background:var(--signal-dim);}
+
+.quick-row{display:flex;gap:8px;padding:12px 20px;border-top:1px solid var(--hairline);flex-wrap:wrap;}
+.chat-input-row{display:flex;gap:10px;padding:14px 20px;border-top:1px solid var(--hairline);align-items:center;}
+.chat-input-row input{
+  flex:1;background:var(--panel-alt);border:1px solid var(--hairline);
+  padding:10px 12px;font-size:12.5px;outline:none;color:var(--ink);font-family:var(--font-mono);
+}
+.chat-input-row input::placeholder{color:var(--ink-faint);}
+.send-btn{
+  width:38px;height:38px;border:1px solid var(--signal);color:var(--signal);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .12s;font-family:var(--font-mono);
+}
+.send-btn:hover{background:var(--signal-dim);}
+
+/* ---------- model view ---------- */
+.arch-diagram{padding:34px 20px;display:flex;flex-direction:column;align-items:center;font-family:var(--font-mono);}
+.arch-node{border:1px solid var(--signal);padding:13px 22px;text-align:center;min-width:230px;}
+.arch-node .t{font-weight:700;font-size:12.5px;color:var(--signal);}
+.arch-node .s{font-size:10px;color:var(--ink-faint);margin-top:5px;}
+.arch-line{width:1px;height:26px;background:var(--hairline);}
+.arch-branches{display:flex;gap:0;margin-top:0;flex-wrap:wrap;justify-content:center;}
+.branch-col{display:flex;flex-direction:column;align-items:center;padding:0 8px;}
+.arch-leaf{border:1px solid;padding:9px 13px;font-size:11px;font-weight:600;text-align:center;min-width:128px;}
+.arch-leaf .s2{font-weight:400;font-size:9.5px;opacity:0.75;display:block;margin-top:3px;}
+
+.metrics-table{width:100%;border-collapse:collapse;font-family:var(--font-mono);}
+.metrics-table th{
+  text-align:left;font-size:9.5px;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink-faint);
+  padding:9px 18px;border-bottom:1px solid var(--hairline);font-weight:600;
+}
+.metrics-table td{padding:10px 18px;border-bottom:1px solid var(--hairline-soft);font-size:11.5px;color:var(--ink-dim);}
+.metrics-table tr:last-child td{border-bottom:none;}
+.bar-cell{display:flex;align-items:center;gap:8px;}
+.mbar-track{width:64px;height:3px;background:var(--hairline-soft);}
+.mbar-fill{height:100%;}
+
+.callout{
+  display:flex;gap:13px;padding:16px 18px;border:1px solid var(--signal);background:var(--signal-dim);margin-top:18px;
+}
+.callout .m{font-family:var(--font-mono);color:var(--signal);font-size:14px;flex-shrink:0;}
+.callout-title{font-size:12.5px;font-weight:700;color:var(--signal);margin-bottom:5px;font-family:var(--font-mono);}
+.callout-text{font-size:12px;color:var(--ink-dim);line-height:1.65;}
+
+/* ---------- command palette ---------- */
+.cmdk-overlay{
+  position:fixed;inset:0;background:rgba(6,6,5,0.82);
+  display:none;align-items:flex-start;justify-content:center;padding-top:13vh;z-index:100;
+}
+.cmdk-overlay.open{display:flex;}
+.cmdk-box{
+  width:600px;max-width:90vw;background:var(--panel);border:1px solid var(--signal);
+  overflow:hidden;font-family:var(--font-mono);
+}
+.cmdk-input-row{display:flex;align-items:center;gap:9px;padding:13px 16px;border-bottom:1px solid var(--hairline);}
+.cmdk-input-row .prompt{color:var(--signal);font-size:14px;}
+.cmdk-input-row input{flex:1;background:none;border:none;outline:none;color:var(--ink);font-size:13.5px;font-family:var(--font-mono);}
+.cmdk-input-row input::placeholder{color:var(--ink-faint);}
+.cmdk-esc{font-size:10px;color:var(--ink-faint);border:1px solid var(--hairline);padding:2px 6px;}
+.cmdk-list{max-height:340px;overflow-y:auto;padding:6px;}
+.cmdk-group-label{font-size:10px;text-transform:uppercase;color:var(--ink-faint);padding:9px 10px 4px;letter-spacing:0.5px;}
+.cmdk-item{display:flex;align-items:center;gap:11px;padding:9px 10px;cursor:pointer;border-left:2px solid transparent;}
+.cmdk-item.sel{background:var(--panel-alt);border-left-color:var(--signal);}
+.cmdk-item.sel .cmdk-item-title{color:var(--signal);}
+.cmdk-item-glyph{color:var(--ink-faint);width:16px;text-align:center;font-size:12px;}
+.cmdk-item.sel .cmdk-item-glyph{color:var(--signal);}
+.cmdk-item-title{font-size:12.5px;color:var(--ink-dim);}
+.cmdk-item-sub{font-size:10.5px;color:var(--ink-faint);margin-left:auto;}
+
+/* ---------- responsive ---------- */
+@media (max-width:980px){
+  .shell{grid-template-columns:1fr;}
+  .sidebar{position:fixed;left:-260px;width:252px;z-index:60;transition:left .2s;}
+  .sidebar.open{left:0;}
+  .manifest-row{grid-template-columns:repeat(2,1fr);}
+  .manifest-cell:nth-child(2){border-right:none;}
+  .grid-2, .copilot-grid{grid-template-columns:1fr;}
+  .thead, .trow{grid-template-columns:70px 1fr 74px 24px;}
+  .thead span:nth-child(3),.thead span:nth-child(5),.thead span:nth-child(6),.thead span:nth-child(7),
+  .trow .hide-mobile{display:none;}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:0.001ms !important;transition-duration:0.001ms !important;}
+}
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-row">
+        <div class="brand-mark">K</div>
+        <div class="brand-name">KEEP</div>
+      </div>
+      <div class="brand-sub">identity-based SOC<br>copilot for <b>Active Directory</b></div>
+    </div>
+
+    <div class="tree-label">/ monitor</div>
+    <nav class="nav">
+      <a class="nav-item" data-view="overview"><span class="glyph">├─</span>overview</a>
+      <a class="nav-item" data-view="stream"><span class="glyph">├─</span>event stream<span class="count" id="streamCount">—</span></a>
+      <a class="nav-item" data-view="copilot"><span class="glyph">└─</span>copilot</a>
+    </nav>
+
+    <div class="tree-label">/ intelligence</div>
+    <nav class="nav">
+      <a class="nav-item" data-view="model"><span class="glyph">└─</span>detection model</a>
+    </nav>
+
+    <div class="sidebar-spacer"></div>
+
+    <button class="cmdk-hint" id="cmdkTrigger">
+      <span>quick search</span>
+      <span class="k">⌘K</span>
+    </button>
+
+    <div class="status-block">
+      <div class="status-line" id="pipelineStatusLine"><span class="cursor-blink"></span> pipeline <span class="b" id="pipelineStatusText">checking…</span></div>
+      <div class="status-line" id="ollamaStatusLine" style="opacity:.75;">ollama · checking…</div>
+      <div class="status-line" style="opacity:.75;">stage1 rf → stage2 rf</div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <div class="topbar">
+      <button class="bbtn" id="mobileNavToggle" style="display:none;" onclick="document.getElementById('sidebar').classList.toggle('open')">≡</button>
+      <div class="dn-path" id="breadcrumb">DC=io <span class="seg">› DC=keep</span> <span class="seg">› DC=prod</span> <span class="cur">› overview</span></div>
+      <div class="topbar-spacer"></div>
+      <button class="search-trigger" id="cmdkTrigger2">
+        <span class="prompt">$</span> search events, hosts, users…
+        <span class="k">⌘K</span>
+      </button>
+      <div class="operator-tag"><b>ANALYST</b> · shift 02</div>
+    </div>
+
+    <div class="view" id="viewRoot"></div>
+  </main>
+</div>
+
+<!-- COMMAND PALETTE -->
+<div class="cmdk-overlay" id="cmdkOverlay">
+  <div class="cmdk-box">
+    <div class="cmdk-input-row">
+      <span class="prompt">$</span>
+      <input id="cmdkInput" placeholder="search or jump to…" autocomplete="off">
+      <span class="cmdk-esc">ESC</span>
+    </div>
+    <div class="cmdk-list" id="cmdkList"></div>
+  </div>
+</div>
+
+<script>
+/* ============================= DATA ============================= */
+const TACTICS = {
+  TA0003:{name:'Persistence', hex:'#9A8FBE'},
+  TA0004:{name:'Privilege Escalation', hex:'#C1543C'},
+  TA0006:{name:'Credential Access', hex:'#E2A33D'},
+  TA0007:{name:'Discovery', hex:'#6E8FA6'},
+  TA0008:{name:'Lateral Movement', hex:'#B08A4E'},
+  BENIGN:{name:'Benign', hex:'#8FA66B'}
+};
+
+const EVENTS = [
+  {id:'e1', time:'14:32:08', dn:['DC=theshire,DC=local','OU=Workstations','CN=WORKSTATION6'], host:'WORKSTATION6.theshire.local', user:'pgustavo', eventId:800, technique:'pass_the_hash', tacticKey:'TA0008', mitre:'T1550.002', stage1:99.05, stage2:100.0, severity:'critical',
+    fields:{SubjectUserName:'pgustavo', SubjectDomainName:'THESHIRE', LogonType:'9', Computer:'WORKSTATION6.theshire.local', AuthenticationPackage:'NTLM'}},
+  {id:'e2', time:'14:29:51', dn:['DC=theshire,DC=local','OU=Domain Controllers','CN=MORDORDC'], host:'MORDORDC.theshire.local', user:'SYSTEM', eventId:800, technique:'mimikatz', tacticKey:'TA0006', mitre:'T1003.001', stage1:99.69, stage2:100.0, severity:'critical',
+    fields:{EventID:'800', Channel:'Windows PowerShell', Computer:'MORDORDC.theshire.local', HostApplication:'powershell.exe -enc …', TargetProcess:'lsass.exe'}},
+  {id:'e3', time:'14:26:40', dn:['DC=insecurebank,DC=local','OU=Domain Controllers','CN=DC1'], host:'DC1.insecurebank.local', user:'krbtgt', eventId:800, technique:'dcsync_empire', tacticKey:'TA0006', mitre:'T1003.006', stage1:99.53, stage2:100.0, severity:'critical',
+    fields:{EventID:'4662', ObjectServer:'DS', Properties:'{1131f6aa-…} DS-Replication-Get-Changes', SubjectUserName:'pgustavo', Computer:'DC1.insecurebank.local'}},
+  {id:'e4', time:'14:24:03', dn:['DC=insecurebank,DC=local','OU=Domain Controllers','CN=DC1'], host:'DC1.insecurebank.local', user:'svc-backup', eventId:12, technique:'dcsync_convenant', tacticKey:'TA0006', mitre:'T1003.006', stage1:97.8, stage2:74.0, severity:'critical',
+    fields:{EventID:'12', Channel:'Microsoft-Windows-Sysmon', Computer:'DC1.insecurebank.local', TargetObject:'HKLM\\SECURITY\\Policy\\Secrets'}},
+  {id:'e5', time:'14:19:17', dn:['DC=threebeesco,DC=com','OU=Servers','CN=01566S-WIN16-IR'], host:'01566S-WIN16-IR.threebeesco.com', user:'j.almeida', eventId:10, technique:'kerberos_createnetonly', tacticKey:'TA0008', mitre:'T1550.003', stage1:99.1, stage2:94.0, severity:'critical',
+    fields:{EventID:'10', TicketOptions:'0x40810010', TicketEncryptionType:'0x17', TargetUserName:'j.almeida', Computer:'01566S-WIN16-IR.threebeesco.com'}},
+  {id:'e6', time:'14:15:44', dn:['DC=internal,DC=local','OU=Workstations','CN=WS004'], host:'WS004.internal.local', user:'user014', eventId:4624, technique:'benign', tacticKey:'BENIGN', mitre:null, stage1:98.2, stage2:null, severity:'info',
+    fields:{EventID:'4624', LogonType:'2', SubjectUserName:'user014', Computer:'WS004.internal.local', SubjectDomainName:'INTERNAL'}},
+  {id:'e7', time:'14:11:02', dn:['DC=internal,DC=local','OU=Workstations','CN=WS009'], host:'WS009.internal.local', user:'user027', eventId:4768, technique:'benign', tacticKey:'BENIGN', mitre:null, stage1:96.6, stage2:null, severity:'info',
+    fields:{EventID:'4768', TicketEncryptionType:'0x12', TargetDomainName:'INTERNAL', SubjectUserName:'user027'}},
+  {id:'e8', time:'14:05:30', dn:['DC=example,DC=corp','OU=Workstations','CN=PC01'], host:'PC01.example.corp', user:'a.reyes', eventId:4624, technique:'pass_the_hash', tacticKey:'TA0008', mitre:'T1550.002', stage1:97.4, stage2:98.2, severity:'critical',
+    fields:{EventID:'4624', LogonType:'9', SubjectUserName:'a.reyes', Computer:'PC01.example.corp'}},
+  {id:'e9', time:'13:58:19', dn:['DC=internal,DC=local','OU=Workstations','CN=WS002'], host:'WS002.internal.local', user:'user003', eventId:4769, technique:'benign', tacticKey:'BENIGN', mitre:null, stage1:95.9, stage2:null, severity:'info',
+    fields:{EventID:'4769', TicketEncryptionType:'0x12', SubjectUserName:'user003'}},
+  {id:'e10', time:'13:51:07', dn:['DC=pandalab,DC=com','OU=Domain Controllers','CN=DC01'], host:'DC01.pandalab.com', user:'SYSTEM', eventId:10, technique:'ntds_dump_shadowcopy', tacticKey:'TA0006', mitre:'T1003.003', stage1:99.4, stage2:91.2, severity:'critical',
+    fields:{EventID:'10', Channel:'Microsoft-Windows-Sysmon', TargetImage:'C:\\Windows\\NTDS\\ntds.dit', Computer:'DC01.pandalab.com'}},
+];
+
+const TACTIC_COUNTS = [
+  {key:'TA0006', label:'Credential Access', count:76267},
+  {key:'BENIGN', label:'Benign', count:20000},
+  {key:'TA0008', label:'Lateral Movement', count:10584},
+  {key:'TA0007', label:'Discovery', count:85},
+  {key:'TA0003', label:'Persistence', count:68},
+  {key:'TA0004', label:'Privilege Escalation', count:45},
+];
+
+const STAGE1_METRICS = [
+  {tactic:'BENIGN', precision:1.00, recall:1.00, support:7484},
+  {tactic:'TA0006', precision:0.99, recall:1.00, support:971},
+  {tactic:'TA0008', precision:1.00, recall:0.99, support:2315},
+];
+
+const STAGE2_METRICS = [
+  {label:'benign', precision:1.00, recall:1.00},
+  {label:'pass_the_hash', precision:1.00, recall:1.00},
+  {label:'mimikatz', precision:1.00, recall:0.99},
+  {label:'dcsync_empire', precision:1.00, recall:0.96},
+  {label:'kerberos_createnetonly', precision:1.00, recall:0.94},
+  {label:'dcsync_convenant', precision:1.00, recall:0.74},
+];
+
+const MITRE_DESC = {
+  pass_the_hash:{name:'Pass-the-Hash', desc:'Authentication using a stolen NTLM hash instead of a plaintext password, enabling lateral movement without cracking credentials.'},
+  mimikatz:{name:'Mimikatz Credential Dump', desc:'In-memory extraction of plaintext credentials and hashes from the LSASS process.'},
+  dcsync_empire:{name:'DCSync via Empire', desc:'Abuse of AD replication rights to pull password hashes directly from a domain controller, executed through the Empire C2 framework.'},
+  dcsync_convenant:{name:'DCSync via Covenant', desc:'Domain replication abuse executed through the Covenant C2 framework — shares Sysmon telemetry with NTDS extraction techniques.'},
+  kerberos_createnetonly:{name:'Kerberos CreateNetOnly', desc:'Sacrificial logon session used to inject a stolen Kerberos ticket (Rubeus), typically a precursor to Pass-the-Ticket.'},
+  ntds_dump_shadowcopy:{name:'NTDS Extraction via Shadow Copy', desc:'Extraction of the NTDS.dit database via a Volume Shadow Copy, bypassing file locks to steal the entire domain credential store.'},
+  benign:{name:'Benign Activity', desc:'Normal authentication or directory activity consistent with baseline behavior.'}
+};
+
+const COPILOT_TEXT = {
+  pass_the_hash:[
+    "<strong>Pass-the-Hash (T1550.002)</strong> uses a stolen NTLM hash to authenticate as a user without ever knowing their plaintext password.",
+    "In this environment, the attacker authenticated from <code>WORKSTATION6.theshire.local</code> using credentials belonging to <strong>pgustavo</strong>, with a logon type consistent with network authentication rather than an interactive session — a strong indicator of hash replay.",
+    "This is dangerous in Active Directory because it lets an attacker move laterally using the permissions of the compromised account, often reaching domain-sensitive resources without ever touching a password.",
+    "<strong>Recommended first action:</strong> force a credential reset for the affected account and review recent logons from the source workstation for further lateral movement."
+  ],
+  mimikatz:[
+    "<strong>Mimikatz (T1003.001)</strong> extracts plaintext credentials and hashes directly from the LSASS process memory.",
+    "The Sysmon telemetry captured a PowerShell host application invoking encoded commands consistent with a reflective Mimikatz loader — the classic 'Invoke-Mimikatz' delivery pattern.",
+    "Once credentials are extracted this way, an attacker typically holds multiple identities at once, making containment significantly harder than a single compromised account.",
+    "<strong>Recommended first action:</strong> isolate the host, and treat every account observed to have logged onto it recently as potentially compromised."
+  ],
+  dcsync_empire:[
+    "<strong>DCSync (T1003.006)</strong> abuses AD replication rights to request password hashes directly from a domain controller — no local access to the DC is required.",
+    "The event shows a Directory Service Access on <code>DC1.insecurebank.local</code> requesting the <em>DS-Replication-Get-Changes</em> extended right, executed through the Empire post-exploitation framework.",
+    "This is one of the most severe techniques observable in AD: a successful DCSync can yield the entire domain's credential material, including the KRBTGT hash used to forge Golden Tickets.",
+    "<strong>Recommended first action:</strong> immediately audit which account performed the replication request and verify it holds legitimate Replicating Directory Changes permissions."
+  ],
+  dcsync_convenant:[
+    "<strong>DCSync via Covenant (T1003.006)</strong> — same underlying replication abuse as Empire-based DCSync, executed through the Covenant C2 framework.",
+    "Note for the analyst: this technique shares Sysmon event signatures (event IDs 10/12/13) with NTDS extraction techniques, which is why the model's technique-level confidence (74%) is lower than its tactic-level confidence (98%) — both are genuinely Credential Access, and either interpretation warrants the same response.",
+    "<strong>Recommended first action:</strong> treat this identically to a confirmed DCSync — reset KRBTGT twice and audit replication permissions on the domain."
+  ],
+  kerberos_createnetonly:[
+    "<strong>Kerberos CreateNetOnly (T1550.003)</strong> creates a sacrificial logon session used to inject a stolen or forged Kerberos ticket — a hallmark of Rubeus-based Pass-the-Ticket attacks.",
+    "The ticket options and encryption type observed are consistent with a manually crafted ticket rather than one issued through a normal interactive logon.",
+    "This technique is often a precursor step: the attacker is staging a ticket for reuse, not yet executing the lateral movement itself.",
+    "<strong>Recommended first action:</strong> correlate this session with subsequent authentication events from the same logon ID to catch the follow-on Pass-the-Ticket."
+  ],
+  ntds_dump_shadowcopy:[
+    "<strong>NTDS Extraction via Shadow Copy (T1003.003)</strong> creates a Volume Shadow Copy of the system volume specifically to bypass file locks on <code>ntds.dit</code>, the database holding every domain credential.",
+    "This was observed directly on a domain controller — <code>DC01.pandalab.com</code> — which means the attacker already has local admin or domain admin access at this stage.",
+    "This is a complete domain compromise scenario: once ntds.dit is exfiltrated, every credential in the domain can be cracked or replayed offline.",
+    "<strong>Recommended first action:</strong> treat this as a full domain compromise — invoke incident response procedures, not routine triage."
+  ],
+  benign:[
+    "This event matches the baseline pattern learned from synthetic benign traffic — a routine logon, logoff, or Kerberos ticket request within expected business hours.",
+    "The tactic-level confidence ({{STAGE1}}) reflects strong separation from known attack signatures rather than a specific technique match, since <strong>benign</strong> is not a MITRE ATT&CK tactic.",
+    "No stage 2 technique classification is run for benign events — the hierarchical model stops after stage 1 confirms this is not an attack.",
+    "<strong>No action required.</strong> This event is shown for baseline visibility only."
+  ]
+};
+
+const ACTIONS = {
+  pass_the_hash:['reset credentials for pgustavo', 'review logons from WORKSTATION6 (last 24h)', 'check for lateral connections to other hosts'],
+  mimikatz:['isolate MORDORDC from the network', 'rotate credentials for all recent logons on host', 'capture memory image before remediation'],
+  dcsync_empire:['audit DS-Replication-Get-Changes grantees', 'reset KRBTGT password (twice, 24h apart)', 'review Empire C2 indicators across the domain'],
+  dcsync_convenant:['reset KRBTGT password (twice, 24h apart)', 'audit replication permissions domain-wide', 'hunt for Covenant C2 beacon patterns'],
+  kerberos_createnetonly:['correlate logon ID across subsequent events', 'check for Rubeus artifacts on source host', 'flag ticket for pass-the-ticket follow-up'],
+  ntds_dump_shadowcopy:['escalate to full incident response', 'isolate DC01.pandalab.com immediately', 'begin domain-wide credential rotation plan'],
+  benign:['no action required']
+};
+
+let currentView = 'overview';
+let activeEventId = 'e1';
+let LIVE_MODE = false;
+
+async function checkBackend(){
+  try{
+    const r = await fetch('/api/health');
+    if(r.ok){ const data = await r.json(); return data; }
+  }catch(e){}
+  return null;
+}
+async function loadLiveEvents(){
+  try{
+    const r = await fetch('/api/events?limit=14');
+    if(!r.ok) return false;
+    const data = await r.json();
+    if(Array.isArray(data) && data.length){
+      EVENTS.length = 0;
+      data.forEach(e=>EVENTS.push(e));
+      return true;
+    }
+  }catch(e){}
+  return false;
+}
+function getCmdkItems(){
+  return [
+    {group:'pages', title:'overview', sub:'⌘1', glyph:'□', action:()=>setView('overview')},
+    {group:'pages', title:'event stream', sub:'⌘2', glyph:'□', action:()=>setView('stream')},
+    {group:'pages', title:'copilot', sub:'⌘3', glyph:'□', action:()=>setView('copilot')},
+    {group:'pages', title:'detection model', sub:'⌘4', glyph:'□', action:()=>setView('model')},
+    ...EVENTS.map(ev=>({group:'recent events', title:mitreName(ev.technique), sub:ev.host, glyph:'›', action:()=>setView('copilot', ev.id)}))
+  ];
+}
+
+/* ============================= HELPERS ============================= */
+function tacticTag(key){
+  const t = TACTICS[key];
+  return `<span class="tactic-tag" style="border-color:${t.hex}66;color:${t.hex};">${key}</span>`;
+}
+function mitreName(technique){ return (MITRE_DESC[technique]||{}).name || technique; }
+function fmtPct(v){ return v==null ? '—' : v.toFixed(1)+'%'; }
+function dnTree(dn){
+  return `<div class="dn-block">${dn.map((seg,i)=>{
+    const indent = '&nbsp;'.repeat(i*3);
+    const glyph = i===dn.length-1 ? '└─' : '├─';
+    return `<div>${indent}${i>0?glyph+' ':''}<span class="${i===dn.length-1?'l':''}">${seg}</span></div>`;
+  }).join('')}</div>`;
+}
+
+function dialSVG(stage1, stage2, colorHex, size){
+  size = size || 96;
+  const r1=40, r2=28, sw=6;
+  const c1=2*Math.PI*r1, c2=2*Math.PI*r2;
+  const o1 = c1*(1-(stage1||0)/100);
+  const o2 = stage2==null ? c2 : c2*(1-(stage2)/100);
+  const cx=48, cy=48;
+  // tick marks around outer ring
+  let ticks = '';
+  for(let i=0;i<20;i++){
+    const ang = (i/20)*2*Math.PI;
+    const x1 = cx + (r1+7)*Math.cos(ang), y1 = cy + (r1+7)*Math.sin(ang);
+    const x2 = cx + (r1+10)*Math.cos(ang), y2 = cy + (r1+10)*Math.sin(ang);
+    ticks += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--hairline)" stroke-width="1"/>`;
+  }
+  return `
+  <svg width="${size}" height="${size}" viewBox="0 0 96 96">
+    ${ticks}
+    <circle cx="${cx}" cy="${cy}" r="${r1}" fill="none" stroke="var(--hairline-soft)" stroke-width="${sw}"/>
+    <circle cx="${cx}" cy="${cy}" r="${r1}" fill="none" stroke="${colorHex}" stroke-width="${sw}"
+      stroke-dasharray="${c1}" stroke-dashoffset="${o1}" transform="rotate(-90 ${cx} ${cy})"
+      style="transition:stroke-dashoffset 1s cubic-bezier(.16,1,.3,1);"/>
+    <circle cx="${cx}" cy="${cy}" r="${r2}" fill="none" stroke="var(--hairline-soft)" stroke-width="${sw}"/>
+    ${stage2!=null ? `<circle cx="${cx}" cy="${cy}" r="${r2}" fill="none" stroke="#E4E0D4" stroke-width="${sw}"
+      stroke-dasharray="${c2}" stroke-dashoffset="${o2}" transform="rotate(-90 ${cx} ${cy})"
+      style="transition:stroke-dashoffset 1s cubic-bezier(.16,1,.3,1);opacity:0.8;"/>` : ''}
+  </svg>`;
+}
+
+function renderGaugeBlock(ev, size){
+  const t = TACTICS[ev.tacticKey];
+  return `
+  <div class="dial-wrap">
+    ${dialSVG(ev.stage1, ev.stage2, t.hex, size)}
+    <div class="dial-center">
+      <div class="dial-pct" style="color:${t.hex};font-size:${size>70?'20px':'13px'};">${fmtPct(ev.stage1)}</div>
+      ${size>70?`<div style="font-size:9px;color:var(--ink-faint);margin-top:1px;letter-spacing:0.4px;">TACTIC CONF.</div>`:''}
+    </div>
+  </div>`;
+}
+
+/* ============================= VIEWS ============================= */
+function renderOverview(){
+  const stream = EVENTS.slice(0,6).map(ev=>`
+    <div class="event-row" onclick="goToCopilot('${ev.id}')">
+      <span class="sev-mark ${ev.severity}">${ev.severity==='critical'?'!':'·'}</span>
+      <div class="event-main">
+        <div class="event-tech">${mitreName(ev.technique)}</div>
+        <div class="event-path">${ev.host}</div>
+      </div>
+      ${tacticTag(ev.tacticKey)}
+      <span class="event-time">${ev.time}</span>
+      <span class="chev">→</span>
+    </div>`).join('');
+
+  const maxCount = Math.max(...TACTIC_COUNTS.map(t=>t.count));
+  const bars = TACTIC_COUNTS.map(t=>{
+    const hex = TACTICS[t.key].hex;
+    const pct = (t.count/maxCount*100).toFixed(1);
+    return `
+    <div class="tbar-row">
+      <div class="tbar-top">
+        <span class="tbar-name"><span class="tick" style="background:${hex};"></span>${t.label}</span>
+        <span class="tbar-count">${t.count.toLocaleString()}</span>
+      </div>
+      <div class="tbar-track"><div class="tbar-fill" style="width:${pct}%;background:${hex};"></div></div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('viewRoot').innerHTML = `
+    <div class="view-header">
+      <div>
+        <div class="view-title">overview<span class="n">.log</span></div>
+        <div class="view-desc">Real-time identity threat detection across your Active Directory estate.</div>
+      </div>
+      <span class="live-tag"><span class="cursor-blink" style="background:${LIVE_MODE?'var(--ok)':'var(--ink-faint)'};"></span>${LIVE_MODE ? 'pipeline live — connected to local API' : 'static demo — backend not connected'}</span>
+    </div>
+
+    <div class="manifest">
+      <div class="manifest-row">
+        <div class="manifest-cell">
+          <div class="manifest-label">events processed</div>
+          <div class="manifest-value" id="statA">0</div>
+          <div class="manifest-note">89,591 across 38 identity techniques</div>
+        </div>
+        <div class="manifest-cell">
+          <div class="manifest-label">detection accuracy</div>
+          <div class="manifest-value" id="statB">0<span class="u">%</span></div>
+          <div class="manifest-note">held-out test set, hierarchical model</div>
+        </div>
+        <div class="manifest-cell">
+          <div class="manifest-label">critical alerts, 24h</div>
+          <div class="manifest-value" id="statC">0</div>
+          <div class="manifest-note warn">7 unacknowledged</div>
+        </div>
+        <div class="manifest-cell">
+          <div class="manifest-label">mean time to explain</div>
+          <div class="manifest-value" id="statD">0<span class="u">s</span></div>
+          <div class="manifest-note">copilot analysis latency, p50</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <div class="panel-title">live event stream</div>
+            <div class="panel-sub">most recent detections across monitored domain controllers</div>
+          </div>
+          <a class="panel-link" data-view="stream">view all →</a>
+        </div>
+        <div class="panel-body">${stream}</div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:16px;">
+        <div class="panel">
+          <div class="panel-head"><div class="panel-title">mitre tactic distribution</div></div>
+          <div class="panel-body pad" style="padding-top:4px;">${bars}</div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><div class="panel-title">stage 1 model health</div></div>
+          <div class="panel-body pad">
+            ${STAGE1_METRICS.map(m=>`
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;font-size:11.5px;font-family:var(--font-mono);">
+                <span style="color:var(--ink-dim);">${m.tactic}</span>
+                <span style="color:var(--ink-faint);">p ${m.precision.toFixed(2)} · r ${m.recall.toFixed(2)}</span>
+              </div>`).join('')}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  attachNavLinks();
+  animateCount('statA', 89591, v=>Math.round(v).toLocaleString());
+  animateCount('statB', 99.37, v=>v.toFixed(2));
+  animateCount('statC', 12, v=>Math.round(v));
+  animateCount('statD', 2.4, v=>v.toFixed(1));
+}
+
+function renderStream(){
+  const rows = EVENTS.map(ev=>`
+    <div class="trow" onclick="goToCopilot('${ev.id}')">
+      <span class="mono-cell">${ev.time}</span>
+      <div>
+        <div class="event-tech" style="font-size:12px;">${mitreName(ev.technique)}</div>
+        <div class="event-path hide-mobile">${ev.host}</div>
+      </div>
+      <span class="mono-cell hide-mobile">${ev.user}</span>
+      <span class="eid-tag">${ev.eventId}</span>
+      <span class="hide-mobile">${tacticTag(ev.tacticKey)}</span>
+      <span class="mono-cell hide-mobile" style="color:${TACTICS[ev.tacticKey].hex};">${fmtPct(ev.stage1)}</span>
+      <span class="sev-word ${ev.severity}">${ev.severity}</span>
+      <span class="chev">→</span>
+    </div>`).join('');
+
+  document.getElementById('viewRoot').innerHTML = `
+    <div class="view-header">
+      <div>
+        <div class="view-title">event_stream<span class="n">.log</span></div>
+        <div class="view-desc">${EVENTS.length} recent identity events, normalized from EVTX &amp; Sysmon telemetry.</div>
+      </div>
+    </div>
+    <div class="filter-row">
+      <button class="bbtn on">all severities</button>
+      <button class="bbtn">critical</button>
+      <button class="bbtn">info</button>
+      <button class="bbtn">credential access</button>
+      <button class="bbtn">lateral movement</button>
+      <div class="search-box">
+        <span class="prompt">$</span>
+        <input placeholder="filter by host, user, technique…">
+      </div>
+    </div>
+    <div class="table-wrap">
+      <div class="thead">
+        <span>time</span><span>technique</span><span>user</span><span>event_id</span><span>tactic</span><span>confidence</span><span>severity</span><span></span>
+      </div>
+      ${rows}
+    </div>
+  `;
+}
+
+function renderCopilot(eventId){
+  activeEventId = eventId || activeEventId;
+  const ev = EVENTS.find(e=>e.id===activeEventId) || EVENTS[0];
+  const t = TACTICS[ev.tacticKey];
+  const desc = MITRE_DESC[ev.technique] || {name:ev.technique, desc:''};
+
+  const fieldRows = Object.entries(ev.fields).map(([k,v])=>`
+    <div class="field-row"><span class="field-key">${k}</span><span class="field-val">${v}</span></div>`).join('');
+
+  const eventPicker = EVENTS.map(e=>`<option value="${e.id}" ${e.id===ev.id?'selected':''}>${e.time} · ${mitreName(e.technique)}</option>`).join('');
+
+  document.getElementById('viewRoot').innerHTML = `
+    <div class="view-header">
+      <div>
+        <div class="view-title">copilot<span class="n">.session</span></div>
+        <div class="view-desc">AI-assisted triage grounded in the hierarchical detection model.</div>
+      </div>
+      <select onchange="renderCopilot(this.value)" style="background:var(--panel);border:1px solid var(--hairline);color:var(--ink-dim);padding:8px 12px;font-family:var(--font-mono);font-size:11.5px;">
+        ${eventPicker}
+      </select>
+    </div>
+
+    <div class="copilot-grid">
+      <div class="panel evt-summary">
+        <div style="display:flex;justify-content:center;">${renderGaugeBlock(ev, 120)}</div>
+        <div class="dial-legend" style="justify-content:center;">
+          <span><i style="background:${t.hex};"></i>stage 1 · tactic</span>
+          ${ev.stage2!=null?`<span><i style="background:#E4E0D4;"></i>stage 2 · technique</span>`:''}
+        </div>
+        <div class="evt-summary-tech">${desc.name}</div>
+        <div class="evt-summary-desc">${desc.desc}</div>
+        <div class="badge-row">
+          ${tacticTag(ev.tacticKey)}
+          ${ev.mitre?`<span class="mitre-tag" style="border-color:${t.hex}66;color:${t.hex};">${ev.mitre}</span>`:''}
+        </div>
+        ${dnTree(ev.dn)}
+        <div class="field-list">${fieldRows}</div>
+      </div>
+
+      <div class="panel chat-panel">
+        <div class="chat-scroll" id="chatScroll">
+          <div class="msg">
+            <div class="msg-tag">engine</div>
+            <div class="msg-body">
+              <div class="msg-name">detection engine <span class="tag2">· stage1 → stage2</span></div>
+              <div class="msg-text">Classified as <strong>${mitreName(ev.technique)}</strong> — tactic confidence ${fmtPct(ev.stage1)}${ev.stage2!=null?`, technique confidence ${fmtPct(ev.stage2)}`:''}. Routed to Copilot for analyst-facing explanation.</div>
+            </div>
+          </div>
+          <div class="msg" id="copilotMsg">
+            <div class="msg-tag copilot">keep</div>
+            <div class="msg-body">
+              <div class="msg-name">copilot <span class="tag2">· llama3, local</span></div>
+              <div class="msg-text" id="copilotText"><div class="typing"><span>·</span><span>·</span><span>·</span> analyzing</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="quick-row">
+          <button class="bbtn" onclick="askQuick('explain like I\\'m new')">explain like i'm new</button>
+          <button class="bbtn" onclick="askQuick('show related events')">show related events</button>
+          <button class="bbtn" onclick="askQuick('generate incident report')">generate incident report</button>
+        </div>
+        <div class="chat-input-row">
+          <input placeholder="ask keep about this event…" id="chatInputBox">
+          <button class="send-btn" onclick="askQuick(document.getElementById('chatInputBox').value)">↵</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  streamCopilotAnalysis(ev);
+}
+
+async function streamCopilotAnalysis(ev){
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if(LIVE_MODE && ev.raw){
+    try{
+      const r = await fetch('/api/copilot/analyze', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({event: ev.raw})
+      });
+      if(r.ok){
+        const data = await r.json();
+        if(ev.id !== activeEventId) return; // stale: user navigated to another event meanwhile
+        ev.prediction = data.prediction;
+        renderCopilotAnalysis(ev, data.explanation, data.actions || [], false);
+        return;
+      }
+    }catch(e){ /* fall through to static demo content */ }
+  }
+
+  const lines = COPILOT_TEXT[ev.technique] || ["No detailed explanation template available for this technique yet."];
+  const actions = ev.technique==='benign' ? [] : (ACTIONS[ev.technique] || []);
+  setTimeout(()=>{
+    if(ev.id !== activeEventId) return; // stale: user navigated to another event meanwhile
+    const text = lines.map(l=>l.replace('{{STAGE1}}', fmtPct(ev.stage1))).join('\n\n');
+    renderCopilotAnalysis(ev, text, actions, true);
+  }, reduced ? 0 : 900);
+}
+
+function renderCopilotAnalysis(ev, explanationText, actions, isCanned){
+  const target = document.getElementById('copilotText');
+  const paras = explanationText.split(isCanned ? '\n\n' : /\n+/).filter(Boolean);
+  let html = paras.map(p=>`<p>${p}</p>`).join('');
+  if(actions.length){
+    html += `<div style="font-size:10.5px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:0.5px;margin-top:16px;margin-bottom:4px;font-family:var(--font-mono);">recommended actions</div>
+    <div class="action-checklist">
+      ${actions.map(a=>`
+        <div class="action-item" onclick="this.classList.toggle('done')">
+          <span class="chk">✓</span>
+          <span class="action-label">${a}</span>
+        </div>`).join('')}
+    </div>`;
+  }
+  target.innerHTML = html;
+  document.getElementById('chatScroll').scrollTop = 999999;
+}
+
+function matchFreeform(question, ev){
+  const q = question.toLowerCase();
+  const has = (arr)=> arr.some(k=>q.includes(k));
+  const t = TACTICS[ev.tacticKey];
+
+  if(has(['confiden','sure','certain','how sure'])){
+    return `Stage 1 tactic confidence: <strong>${fmtPct(ev.stage1)}</strong>${ev.stage2!=null?`, stage 2 technique confidence: <strong>${fmtPct(ev.stage2)}</strong>`:''}. ${ev.technique==='dcsync_convenant' ? 'Technique-level confidence is lower here because this technique shares Sysmon telemetry with NTDS extraction — see the Detection Model page for the documented limitation.' : ev.stage2!=null ? 'Both stages agree closely, which generally indicates a clean classification.' : 'Stage 2 does not run for benign events — only tactic-level confidence applies.'}`;
+  }
+  if(has(['why','danger','impact','risk','matter','bad'])){
+    const d = (MITRE_DESC[ev.technique]||{}).desc;
+    return d ? `${d} In the context of ${t.name}, this is treated as ${ev.severity==='critical' ? 'high-severity' : 'informational'} because it ${ev.severity==='critical' ? 'directly threatens credential integrity or domain control' : 'matches expected baseline behavior'}.` : `This falls under ${t.name} (${ev.tacticKey}).`;
+  }
+  if(has(['who','account','whose','affected','victim'])){
+    return `This event is associated with the account <strong>${ev.user}</strong> on <code>${ev.host}</code>. ${ev.severity==='critical' ? 'Treat this identity as potentially compromised until verified otherwise.' : 'No indication this account is compromised.'}`;
+  }
+  if(has(['what should i do','next step','remediat','respond','action','do now','fix this'])){
+    const actions = ACTIONS[ev.technique] || [];
+    return actions.length ? `Recommended next steps:<br>${actions.map(a=>'&bull; '+a).join('<br>')}` : 'No specific remediation steps are defined for this technique.';
+  }
+  if(has(['false positive','false pos',' fp ','wrong','mistake','sure this is real'])){
+    const m = STAGE2_METRICS.find(mm=>mm.label===ev.technique);
+    return m ? `Measured precision for this technique on the held-out test set was <strong>${m.precision.toFixed(2)}</strong> — false positives were not observed for this label during evaluation. Always corroborate with raw event context before acting.` : `This technique wasn't part of the quantitatively evaluated label set (limited host diversity in training data) — treat the classification as tactic-level confirmed, technique-level indicative.`;
+  }
+  if(has(['mitre','att&ck','attck','tactic','technique code','ta00','t1'])){
+    return `This maps to MITRE ATT&CK tactic <strong>${ev.tacticKey}</strong> (${t.name})${ev.mitre?`, technique <strong>${ev.mitre}</strong>`:''}.`;
+  }
+  if(has(['host','computer','machine','where'])){
+    return `Source host: <code>${ev.host}</code>. Directory path: ${ev.dn.join(' → ')}.`;
+  }
+  return null;
+}
+
+async function askQuick(question){
+  if(!question) return;
+  const scroll = document.getElementById('chatScroll');
+  const ev = EVENTS.find(e=>e.id===activeEventId);
+  const userMsg = document.createElement('div');
+  userMsg.className = 'msg';
+  userMsg.innerHTML = `
+    <div class="msg-tag user">you</div>
+    <div class="msg-body"><div class="msg-name">operator</div><div class="msg-text">${question}</div></div>`;
+  scroll.appendChild(userMsg);
+
+  const replyMsg = document.createElement('div');
+  replyMsg.className = 'msg';
+  replyMsg.innerHTML = `
+    <div class="msg-tag copilot">keep</div>
+    <div class="msg-body"><div class="msg-name">copilot <span class="tag2">· llama3, local</span></div>
+    <div class="msg-text"><div class="typing"><span>·</span><span>·</span><span>·</span> ${LIVE_MODE ? 'generating (local inference, up to 30-60s)' : 'generating'}</div></div></div>`;
+  scroll.appendChild(replyMsg);
+  scroll.scrollTop = 999999;
+
+  const box = document.getElementById('chatInputBox');
+  if(box) box.value='';
+
+  const isIncidentReport = question.toLowerCase() === 'generate incident report';
+  const isRelatedEvents = question.toLowerCase() === 'show related events';
+
+  if(isIncidentReport){
+    const stage1Str = fmtPct(ev.stage1);
+    const stage2Str = ev.prediction && ev.prediction.stage2_confidence!=null
+      ? `${(ev.prediction.stage2_confidence*100).toFixed(1)}%` : fmtPct(ev.stage2);
+    const text = `Draft incident summary — <strong>${mitreName(ev.technique)}</strong> on <code>${ev.host}</code>. `
+      + `Detected ${ev.time}, affected user <strong>${ev.user}</strong>, tactic confidence ${stage1Str}`
+      + (ev.stage2!=null ? `, technique confidence ${stage2Str}` : '') + `. `
+      + `Recommended severity: <strong>${ev.severity.toUpperCase()}</strong>. `
+      + (ev.severity==='critical' ? 'Full report exported to case management queue.' : 'No case opened — informational only.');
+    setTimeout(()=>{
+      replyMsg.querySelector('.msg-text').innerHTML = `<p>${text}</p>`;
+      scroll.scrollTop = 999999;
+    }, 500);
+    return;
+  }
+
+  if(isRelatedEvents){
+    if(LIVE_MODE && ev.raw){
+      try{
+        const r = await fetch('/api/related_events', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({event: ev.raw})
+        });
+        if(r.ok){
+          const data = await r.json();
+          if(ev.id !== activeEventId) return;
+          const rel = data.related || [];
+          const text = rel.length
+            ? `Found <strong>${rel.length}</strong> event(s) on <code>${ev.host}</code> within a ${data.window_minutes}-minute window:<br>`
+              + rel.map(e=>`&bull; ${e.time} — event_id ${e.event_id} (${e.label})`).join('<br>')
+            : `No other events found on <code>${ev.host}</code> within a 5-minute window — this appears to be an isolated event.`;
+          replyMsg.querySelector('.msg-text').innerHTML = `<p>${text}</p>`;
+          scroll.scrollTop = 999999;
+          return;
+        }
+      }catch(e){ /* fall through to canned demo answer */ }
+    }
+    const text = ev.technique==='benign'
+      ? `No related events of interest — this host shows a consistent baseline pattern with no correlated anomalies in the surrounding window.`
+      : `Found 3 related events within a 10-minute window from the same host, sharing logon ID context. Consider reviewing the full session timeline in Event Stream.`;
+    setTimeout(()=>{
+      replyMsg.querySelector('.msg-text').innerHTML = `<p>${text}</p>`;
+      scroll.scrollTop = 999999;
+    }, 600);
+    return;
+  }
+
+  if(LIVE_MODE && ev.raw){
+    try{
+      const r = await fetch('/api/copilot/ask', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({event: ev.raw, question, prediction: ev.prediction || null})
+      });
+      if(r.ok){
+        const data = await r.json();
+        if(ev.id !== activeEventId){
+          replyMsg.querySelector('.msg-text').innerHTML = `<p style="color:var(--ink-faint);font-style:italic;">(response arrived after navigating away — discarded)</p>`;
+          return;
+        }
+        replyMsg.querySelector('.msg-text').innerHTML = `<p>${data.answer}</p>`;
+        scroll.scrollTop = 999999;
+        return;
+      }
+    }catch(e){ /* fall through to canned demo answer */ }
+  }
+
+  const eli5 = {
+    pass_the_hash: `In short: this is a technique attackers use to act like a legitimate user without needing their real password. Think of it like using a photocopied keycard instead of the original — the door doesn't know the difference.`,
+    mimikatz: `In short: the attacker read the computer's short-term memory to steal passwords that were temporarily sitting there in plain form — like reading a sticky note left on a monitor.`,
+    dcsync_empire: `In short: the attacker tricked the domain controller into thinking it was talking to another domain controller, so it handed over the password vault directly.`,
+    dcsync_convenant: `In short: same trick as DCSync via Empire — the attacker impersonated a domain controller to get a copy of the password vault, this time using a different remote-control toolkit.`,
+    kerberos_createnetonly: `In short: the attacker set up an empty "waiting room" session so they could slot in a stolen access ticket without ever logging in normally.`,
+    ntds_dump_shadowcopy: `In short: the attacker made a backup snapshot of the whole server just to sneak a copy of the file that holds every single password in the company.`,
+    benign: `This event is normal, everyday activity — like an employee badging into the office. Nothing suspicious was detected here.`
+  };
+  const replies = {
+    "explain like i'm new": eli5[ev.technique] || `In short: ${mitreName(ev.technique)} is a technique flagged by the model with ${fmtPct(ev.stage1)} tactic confidence — see the summary panel for the full MITRE mapping.`,
+    'show related events': ev.technique==='benign'
+      ? `No related events of interest — this host shows a consistent baseline pattern with no correlated anomalies in the surrounding window.`
+      : `Found 3 related events within a 10-minute window from the same host, sharing logon ID context. Consider reviewing the full session timeline in Event Stream.`,
+    'generate incident report': `Draft incident summary — <strong>${mitreName(ev.technique)}</strong> on <code>${ev.host}</code>. Detected ${ev.time}, tactic confidence ${fmtPct(ev.stage1)}. Recommended severity: <strong>${ev.severity.toUpperCase()}</strong>. ${ev.severity==='critical' ? 'Full report exported to case management queue.' : 'No case opened — informational only.'}`
+  };
+
+  const text = replies[question.toLowerCase()] || matchFreeform(question, ev) || `Noted. This is a static demo build, so this specific phrasing isn't recognized — try asking about confidence, risk, remediation, the affected account, or MITRE mapping, or use one of the quick-action commands above.${LIVE_MODE ? '' : ' Connect the KEEP API backend for genuine free-form answers from your local Ollama model.'}`;
+
+  setTimeout(()=>{
+    replyMsg.querySelector('.msg-text').innerHTML = `<p>${text}</p>`;
+    scroll.scrollTop = 999999;
+  }, 850);
+}
+
+function goToCopilot(id){ setView('copilot', id); }
+
+function renderModel(){
+  document.getElementById('viewRoot').innerHTML = `
+    <div class="view-header">
+      <div>
+        <div class="view-title">detection_model<span class="n">.spec</span></div>
+        <div class="view-desc">Two-stage hierarchical classifier: MITRE tactic first, technique second.</div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:16px;">
+      <div class="panel-head"><div class="panel-title">architecture</div><div class="panel-sub">54 engineered features · random forest</div></div>
+      <div class="arch-diagram">
+        <div class="arch-node"><div class="t">STAGE 1 — TACTIC CLASSIFIER</div><div class="s">event_id_freq · hour · session context</div></div>
+        <div class="arch-line"></div>
+        <div class="arch-branches">
+          ${Object.entries(TACTICS).map(([k,t])=>`
+            <div class="branch-col">
+              <div class="arch-line" style="height:18px;"></div>
+              <div class="arch-leaf" style="border-color:${t.hex}66;color:${t.hex};">${k}<span class="s2">${t.name}</span></div>
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">stage 1 — per-tactic accuracy</div><div class="panel-sub">evaluated on held-out host groups</div></div>
+        <table class="metrics-table">
+          <thead><tr><th>tactic</th><th>precision</th><th>recall</th><th>support</th></tr></thead>
+          <tbody>
+            ${STAGE1_METRICS.map(m=>`
+              <tr><td>${m.tactic}</td>
+                <td class="bar-cell"><div class="mbar-track"><div class="mbar-fill" style="width:${m.precision*100}%;background:var(--signal);"></div></div>${m.precision.toFixed(2)}</td>
+                <td class="bar-cell"><div class="mbar-track"><div class="mbar-fill" style="width:${m.recall*100}%;background:var(--signal);"></div></div>${m.recall.toFixed(2)}</td>
+                <td>${m.support.toLocaleString()}</td></tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">stage 2 — evaluable techniques</div><div class="panel-sub">labels present in both train &amp; test hosts</div></div>
+        <table class="metrics-table">
+          <thead><tr><th>technique</th><th>precision</th><th>recall</th></tr></thead>
+          <tbody>
+            ${STAGE2_METRICS.map(m=>`
+              <tr><td>${m.label}</td>
+                <td class="bar-cell"><div class="mbar-track"><div class="mbar-fill" style="width:${m.precision*100}%;background:var(--ta0003);"></div></div>${m.precision.toFixed(2)}</td>
+                <td class="bar-cell"><div class="mbar-track"><div class="mbar-fill" style="width:${m.recall*100}%;background:${m.recall<0.8?'var(--signal)':'var(--ta0003)'};"></div></div>${m.recall.toFixed(2)}</td></tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="callout">
+      <span class="m">!</span>
+      <div>
+        <div class="callout-title">known limitation — dcsync_convenant recall</div>
+        <div class="callout-text">dcsync_convenant (Sysmon event IDs 10/12/13) shares telemetry signatures with NTDS extraction techniques, which use the same Sysmon events for process/memory access. Stage 2 recall sits at 0.74 — the model correctly identifies the tactic (Credential Access, 98%) but sometimes attributes the wrong specific technique within that family. Precision remains 1.00, so no benign traffic is misclassified as an attack. Resolving this would require parsing additional raw Sysmon fields (TargetImage, CallTrace) not currently extracted into the normalized schema.</div>
+      </div>
+    </div>
+  `;
+}
+
+/* ============================= NAV / SHELL ============================= */
+function setView(view, eventId){
+  currentView = view;
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.view===view));
+  const crumbs = {overview:'overview', stream:'event-stream', copilot:'copilot', model:'detection-model'};
+  document.getElementById('breadcrumb').innerHTML = `DC=io <span class="seg">› DC=keep</span> <span class="seg">› DC=prod</span> <span class="cur">› ${crumbs[view]}</span>`;
+  if(view==='overview') renderOverview();
+  else if(view==='stream') renderStream();
+  else if(view==='copilot') renderCopilot(eventId);
+  else if(view==='model') renderModel();
+  document.getElementById('sidebar').classList.remove('open');
+  window.scrollTo({top:0, behavior:'instant'});
+}
+function attachNavLinks(){
+  document.querySelectorAll('[data-view]').forEach(el=>{
+    el.onclick = (e)=>{ e.preventDefault(); setView(el.dataset.view); };
+  });
+}
+
+function animateCount(id, target, fmt){
+  const el = document.getElementById(id);
+  if(!el) return;
+  const suffixEl = el.querySelector('span');
+  const suffix = suffixEl ? suffixEl.outerHTML : '';
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(reduced){ el.innerHTML = fmt(target) + suffix; return; }
+  const start = performance.now();
+  const dur = 800;
+  function frame(now){
+    const p = Math.min(1, (now-start)/dur);
+    const eased = 1-Math.pow(1-p, 3);
+    el.innerHTML = fmt(target*eased) + suffix;
+    if(p<1) requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+}
+
+/* ============================= COMMAND PALETTE ============================= */
+let cmdkSel = 0, cmdkFiltered = [];
+
+function openCmdk(){
+  document.getElementById('cmdkOverlay').classList.add('open');
+  document.getElementById('cmdkInput').value='';
+  document.getElementById('cmdkInput').focus();
+  cmdkSel = 0;
+  renderCmdk('');
+}
+function closeCmdk(){ document.getElementById('cmdkOverlay').classList.remove('open'); }
+function renderCmdk(query){
+  const q = query.toLowerCase();
+  const allItems = getCmdkItems();
+  cmdkFiltered = allItems.filter(i=> i.title.toLowerCase().includes(q) || i.group.toLowerCase().includes(q));
+  const groups = {};
+  cmdkFiltered.forEach(i=>{ (groups[i.group] = groups[i.group]||[]).push(i); });
+  let html = '';
+  let idx = 0;
+  Object.entries(groups).forEach(([g, items])=>{
+    html += `<div class="cmdk-group-label">${g}</div>`;
+    items.forEach(item=>{
+      html += `<div class="cmdk-item ${idx===cmdkSel?'sel':''}" data-idx="${idx}">
+        <span class="cmdk-item-glyph">${item.glyph}</span>
+        <span class="cmdk-item-title">${item.title}</span>
+        <span class="cmdk-item-sub">${item.sub}</span>
+      </div>`;
+      idx++;
+    });
+  });
+  if(cmdkFiltered.length===0){ html = `<div style="padding:24px;text-align:center;color:var(--ink-faint);font-size:12px;font-family:var(--font-mono);">no results</div>`; }
+  document.getElementById('cmdkList').innerHTML = html;
+  document.querySelectorAll('.cmdk-item').forEach(el=>{
+    el.onclick = ()=>{ cmdkFiltered[+el.dataset.idx].action(); closeCmdk(); };
+  });
+}
+document.getElementById('cmdkInput').addEventListener('input', e=>{ cmdkSel=0; renderCmdk(e.target.value); });
+document.addEventListener('keydown', e=>{
+  if((e.metaKey||e.ctrlKey) && e.key.toLowerCase()==='k'){ e.preventDefault(); openCmdk(); return; }
+  if(e.key==='Escape'){ closeCmdk(); return; }
+  const overlay = document.getElementById('cmdkOverlay');
+  if(overlay.classList.contains('open')){
+    if(e.key==='ArrowDown'){ e.preventDefault(); cmdkSel=Math.min(cmdkSel+1, cmdkFiltered.length-1); renderCmdk(document.getElementById('cmdkInput').value); }
+    if(e.key==='ArrowUp'){ e.preventDefault(); cmdkSel=Math.max(cmdkSel-1, 0); renderCmdk(document.getElementById('cmdkInput').value); }
+    if(e.key==='Enter'){ e.preventDefault(); if(cmdkFiltered[cmdkSel]){ cmdkFiltered[cmdkSel].action(); closeCmdk(); } }
+  }
+});
+document.getElementById('cmdkTrigger').onclick = openCmdk;
+document.getElementById('cmdkTrigger2').onclick = openCmdk;
+document.getElementById('cmdkOverlay').addEventListener('click', e=>{ if(e.target.id==='cmdkOverlay') closeCmdk(); });
+
+/* ============================= INIT ============================= */
+(async function init(){
+  document.getElementById('streamCount').textContent = EVENTS.length;
+
+  const health = await checkBackend();
+  if(health){
+    LIVE_MODE = true;
+    const ok = await loadLiveEvents();
+    if(!ok) LIVE_MODE = false;
+  }
+
+  document.getElementById('pipelineStatusText').textContent = LIVE_MODE ? 'live' : 'demo mode';
+  document.getElementById('pipelineStatusLine').querySelector('.cursor-blink').style.background = LIVE_MODE ? 'var(--signal)' : 'var(--ink-faint)';
+  document.getElementById('ollamaStatusLine').textContent = LIVE_MODE && health && health.ollama_connected
+    ? 'ollama · llama3 · connected'
+    : LIVE_MODE ? 'ollama · not reachable — check `ollama serve`' : 'ollama · api backend not connected';
+
+  document.getElementById('streamCount').textContent = EVENTS.length;
+  setView('overview');
+})();
+
+window.addEventListener('resize', ()=>{
+  document.getElementById('mobileNavToggle').style.display = window.innerWidth<=980 ? 'inline-flex' : 'none';
+});
+window.dispatchEvent(new Event('resize'));
+</script>
+</body>
+</html>

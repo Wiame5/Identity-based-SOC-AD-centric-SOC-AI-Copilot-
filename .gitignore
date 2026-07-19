@@ -1,0 +1,28 @@
+﻿# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# IDE
+.idea/
+.vscode/
+
+# Dataset (volumineux / sources externes sous licence tierce)
+data/raw/
+data/interim/
+data/processed/
+data/splits/
+EVTX-ATTACK-SAMPLES/
+
+# Modeles entraines (decommenter la ligne suivante si tu veux les exclure)
+# models/*.pkl
+
+# Fichiers de scratch/debug
+test_prompt.json
+
+# OS
+.DS_Store
+Thumbs.db

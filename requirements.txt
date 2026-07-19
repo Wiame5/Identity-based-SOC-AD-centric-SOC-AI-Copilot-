@@ -1,0 +1,15 @@
+﻿pandas
+numpy
+pydantic
+scikit-learn
+xgboost
+python-evtx
+lxml
+networkx
+shap
+langgraph
+langchain-core
+requests
+pyyaml
+matplotlib
+seaborn
